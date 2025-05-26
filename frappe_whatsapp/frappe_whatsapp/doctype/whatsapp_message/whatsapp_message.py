@@ -68,12 +68,21 @@ class WhatsAppMessage(Document):
             parameters = []
             template_parameters = []
 
-            ref_doc = frappe.get_doc(self.reference_doctype, self.reference_name)
-            for field_name in field_names:
-                value = ref_doc.get_formatted(field_name.strip())
+            if self.flags.custom_ref_doc:
+                custom_values = self.flags.custom_ref_doc
+                for field_name in field_names:
+                    value = custom_values.get(field_name.strip())
+                    parameters.append({"type": "text", "text": value})
+                    template_parameters.append(value)                    
 
-                parameters.append({"type": "text", "text": value})
-                template_parameters.append(value)
+            else:
+                ref_doc = frappe.get_doc(self.reference_doctype, self.reference_name)
+                for field_name in field_names:
+                    value = ref_doc.get_formatted(field_name.strip())
+
+                    parameters.append({"type": "text", "text": value})
+                    template_parameters.append(value)
+
 
             self.template_parameters = json.dumps(template_parameters)
 
@@ -85,23 +94,20 @@ class WhatsAppMessage(Document):
             )
 
         if template.header_type and template.sample:
-            field_names = template.sample.split(",")
-            header_parameters = []
-            template_header_parameters = []
-
-            ref_doc = frappe.get_doc(self.reference_doctype, self.reference_name)
-            for field_name in field_names:
-                value = ref_doc.get_formatted(field_name.strip())
-                
-                header_parameters.append({"type": "text", "text": value})
-                template_header_parameters.append(value)
-
-            self.template_header_parameters = json.dumps(template_header_parameters)
-
-            data["template"]["components"].append({
-                "type": "header",
-                "parameters": header_parameters,
-            })
+            if template.header_type == 'IMAGE':
+                if template.sample.startswith("http"):
+                    url = f'{template.sample}'
+                else:
+                    url = f'{frappe.utils.get_url()}{template.sample}'
+                data['template']['components'].append({
+                    "type": "header",
+                    "parameters": [{
+                        "type": "image",
+                        "image": {
+                            "link": url
+                        }
+                    }]
+                })
 
         self.notify(data)
 
